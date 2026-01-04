@@ -19,7 +19,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
+"""
 # Initialize clients
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index("dominic-personal-data")
@@ -33,12 +33,50 @@ redis_client = redis.Redis(
     decode_responses=True,
     ssl=True  # REQUIRED for Upstash
 )
+"""
+
+pc = None
+index = None
+openai_client = None
+redis_client = None
+
+def require_env(var_name: str):
+    value = os.getenv(var_name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {var_name}")
+    return value
+
+def init_clients():
+    global pc, index, openai_client, redis_client
+
+    openai_key = require_env("OPENAI_API_KEY")
+    pinecone_key = require_env("PINECONE_API_KEY")
+    redis_host = require_env("REDIS_HOST")
+    redis_port = int(require_env("REDIS_PORT"))
+    redis_password = require_env("REDIS_PASSWORD")
+
+    if openai_client is None:
+        openai_client = OpenAI(api_key=openai_key)
+
+    if pc is None:
+        pc = Pinecone(api_key=pinecone_key)
+        index = pc.Index("dominic-personal-data")
+
+    if redis_client is None:
+        redis_client = redis.Redis(
+            host=redis_host,
+            port=redis_port,
+            password=redis_password,
+            decode_responses=True,
+            ssl=True
+        )
 
 class Query(BaseModel):
     question: str
 
 @app.post("/chat")
 async def chat(query: Query):
+    init_clients()
     try:
         # 1. Embed the question
         question_embedding = openai_client.embeddings.create(
@@ -143,11 +181,13 @@ async def health():
 
 @app.post("/visit")
 async def register_visit():
+    init_clients()
     visits = redis_client.incr("stats:conversations")
     return {"conversations": visits}
 
 @app.get("/stats")
 async def get_stats():
+    init_clients()
     keys = [
         "stats:conversations",
         "stats:messages_answered",
@@ -161,6 +201,7 @@ async def get_stats():
         "messages": int(values[1] or 0),
         "total_tokens": int(values[2] or 0)
     }
+
 
 """
 @app.get("/reset")

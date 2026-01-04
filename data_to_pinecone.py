@@ -26,7 +26,8 @@ chunk_files = [
     'projects_chunks.json',
     'experience_chunks.json',
     'hobbies_chunks.json',
-    'project_details_chunks.json'
+    'project_details_chunks.json',
+    'skills_chunks.json'
 ]
 
 for filename in chunk_files:
